@@ -6,45 +6,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **nakari** is a unique AI agent designed to develop a distinct personality through accumulated experiences, rather than role-playing a predefined character.
 
-### Design Philosophy
-
-> "I don't play a character, I am."
-
-The core principle: nakari does not perform role-play. Instead, she:
-1. Gathers information through iterative **ReAct loops**
-2. Forms her own insights and understanding
-3. Writes experiences to her **memory library** (Neo4j graph database)
-4. Uses the memory library to form unique perspectives
-
-Over time, the accumulated memories become unique to each nakari instance, reflecting her individual characteristics.
+This is the **Python implementation** of nakari. The original TypeScript version has been replaced.
 
 ## Common Commands
 
 ```bash
 # Install dependencies
-pnpm install
-
-# Build TypeScript to JavaScript
-pnpm build
-
-# Type-check without emitting
-pnpm typecheck
+pip install -e .
 
 # Run the interactive CLI
-pnpm cli
+nakari
+
+# Or run with Python module
+python -m nakari.cli
 
 # Run tests
-pnpm test
-
-# Run tests in watch mode
-pnpm test:watch
+pytest
 ```
 
 ### Neo4j Setup
 
 ```bash
 # Start Neo4j database
-docker-compose up -d
+docker compose up -d
 
 # Neo4j Browser UI: http://localhost:7474
 # Bolt protocol: bolt://localhost:7687
@@ -75,18 +59,18 @@ SERPER_API_KEY=your-serper-key
 
 ### ReAct Loop Pattern
 
-The agent operates using a ReAct (Reasoning + Acting) loop in `src/agent/loop.ts`:
+The agent operates using a ReAct (Reasoning + Acting) loop in `nakari/agent/loop.py`:
 
 ```
 User Input
     │
     ▼
-┌──────────────────────────────────────┐
+┌───────────────────────────────────────┐
 │            ReAct Loop                 │
-│  (max 10 iterations)                  │
+│  (max 10 iterations)              │
 │                                      │
-│  Thought ─► Action ─► Observation    │
-│      ▲                     │         │
+│  Thought ─► Action ─► Observation│
+│      ▲                    │         │
 │      └─────────────────────┘         │
 │                                      │
 │  Actions can be:                      │
@@ -94,18 +78,18 @@ User Input
 │   - memory_write (write Cypher)      │
 │   - memory_schema (inspect DB)       │
 │   - embedding (generate vector)      │
-│   - web_search (search internet)     │
-└──────────────────────────────────────┘
+│   - web_search (search internet)   │
+└───────────────────────────────────────┘
     │
     ▼
 Final Response
 ```
 
 **Key files:**
-- `src/agent/loop.ts` - ReAct loop engine with `MAX_ITERATIONS = 10`
-- `src/agent/prompt.ts` - System prompt (schema-free philosophy)
-- `src/agent/tools.ts` - OpenAI function-calling tool definitions (`MEMORY_TOOLS`)
-- `src/cli.ts` - Interactive REPL interface
+- `nakari/agent/loop.py` - ReAct loop engine with `MAX_ITERATIONS = 10`
+- `nakari/agent/prompt.py` - System prompt (schema-free philosophy)
+- `nakari/agent/tools.py` - OpenAI function-calling tool definitions
+- `nakari/cli.py` - Interactive REPL interface
 
 ### Memory System (Neo4j)
 
@@ -113,14 +97,14 @@ Uses **Neo4j graph database** for memory storage.
 
 **Why Neo4j:** Graph databases provide strong relational capabilities, allowing nakari to freely explore and traverse connections within her memory library, enabling more organic and associative thinking.
 
-**Key files:**
-- `src/memory/client.ts` - `MemoryClient` class with `query()`, `write()`, `schema()`, `verifyConnectivity()`, `close()`
+**Key module:**
+- `nakari/memory` - `MemoryClient` class with `query()`, `write()`, `schema()`, `verify_connectivity()`, `close()`
 
 ### Schema-Free Design
 
 nakari has **full autonomy** over her memory structure:
 - No predefined `Experience`, `Insight`, or other entity types
-- No domain methods like `createMemory()`
+- No domain methods like `create_memory()`
 - She writes raw Cypher queries, deciding her own:
   - Node labels (e.g., `User`, `Conversation`, `Topic`)
   - Properties (any key-value pairs)
@@ -135,81 +119,59 @@ nakari has **full autonomy** over her memory structure:
 
 ### Web Search Module
 
-The search module (`src/search/`) provides extensible web search capability:
+The search module (`nakari/search/`) provides extensible web search capability:
 
-- `providers.ts` - `SearchProvider` interface + `SerperProvider` implementation
-- `client.ts` - `SearchClient` class + `createSerperClient()` factory
-- `types.ts` - `SearchResult`, `SearchResponse`, `SearchOptions`
-- `errors.ts` - `SearchError`, `SearchAuthError`, `SearchRateLimitError`
-
-The provider abstraction allows adding other search services (Tavily, SerpAPI, etc.) in the future.
-
-### Neo4j Conventions
-
-- All queries must use **parameterized Cypher** (`$paramName`) for security
-- Sessions are properly closed using `try/finally` blocks
-- Neo4j native types (Integers, Nodes, Relationships) are converted to plain JS objects
+- `providers.py` - `SearchProvider` interface + `SerperProvider` implementation
+- `client.py` - `SearchClient` class + `create_serper_client()` factory
+- `types.py` - `SearchResult`, `SearchResponse`, `SearchOptions`
+- `errors.py` - `SearchError`, `SearchAuthError`, `SearchRateLimitError`
 
 ## Project Structure
 
 ```
-src/
-├── agent/
-│   ├── loop.ts      # ReAct loop engine
-│   ├── prompt.ts    # System prompt
-│   └── tools.ts     # OpenAI tool definitions
-├── memory/
-│   └── client.ts    # Neo4j client
-├── search/
-│   ├── client.ts    # SearchClient + factory
-│   ├── providers.ts # SearchProvider interface + Serper
-│   ├── types.ts     # Search result types
-│   ├── errors.ts    # Custom error classes
-│   └── index.ts     # Module exports
-├── config/
-│   └── index.ts     # Environment-based config loading
-└── cli.ts           # Interactive CLI (replaces demo.ts)
+derbao/
+├── nakari/            # Package and code
+│   ├── agent/         # ReAct loop implementation
+│   ├── cli.py          # Interactive CLI
+│   ├── config/         # Environment-based config
+│   ├── memory/         # Neo4j memory client
+│   └── search/         # Web search module
+├── pyproject.toml     # Python project config
+├── requirements.txt   # Python dependencies
+├── README.md         # Project documentation
+├── docker-compose.yml # Neo4j Docker config
+└── ...
 ```
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
-| Runtime | Node.js 20+ |
-| Language | TypeScript 5.9 (strict mode) |
+| Runtime | Python 3.12+ |
 | Database | Neo4j 5 |
 | Search API | Serper.dev (Google Search) |
-| LLM Interface | OpenAI SDK v6.18.0 (supports OpenAI-compatible APIs) |
-| Package Manager | pnpm |
-| Build Tool | TypeScript compiler (tsc) |
-| Test Framework | Vitest 4.0.18 |
-| Runtime Executor | tsx 4.21.0 |
+| LLM Interface | OpenAI SDK (supports OpenAI-compatible APIs) |
+| Package Manager | pip / pyproject |
+| Build Tool | Hatchling |
+| CLI UI | Rich |
+| Async Runtime | asyncio |
 
 ## Code Style
 
-See `AGENTS.md` for detailed conventions. Key points:
-- ESM imports only (no CommonJS)
 - 2-space indentation, double quotes, semicolons required
 - 100-character line length max
-- kebab-case for files/directories, camelCase for functions
-- No `I` prefix on interfaces
-- JSDoc documentation on public APIs
-
-## TypeScript Configuration
-
-- Target: ES2022
-- Module: NodeNext
-- Strict mode enabled
-- `noUncheckedIndexedAccess: true`
-- Source maps and declarations enabled
-- Output directory: `dist/`
+- snake_case for files/directories, functions, and variables
+- PascalCase for classes
+- Type hints required on all public APIs
+- Docstrings on public APIs
+- async/await for I/O operations
 
 ## Adding New Tools
 
 To add a new tool to the ReAct loop:
 
-1. **Add tool definition** in `src/agent/tools.ts` to the `MEMORY_TOOLS` array
-2. **Add case** in `src/agent/loop.ts` in the `executeTool()` function's switch statement
+1. **Add tool definition** in `nakari/agent/tools.py` to the `get_memory_tools()` function
+2. **Add case** in `nakari/agent/loop.py` in the `_execute_tool()` function's match statement
 3. **Update `LoopOptions`** if the tool requires a new client dependency
 
 Pattern follows existing tools like `embedding` and `web_search` — external API calls are async, return structured data, and errors are caught and returned as `{ error: message }`.

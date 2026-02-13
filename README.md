@@ -1,160 +1,181 @@
 # nakari
 
+**nakari** is a unique AI agent designed to develop a distinct personality through accumulated experiences, rather than role-playing a predefined character.
+
+## Design Philosophy
+
 > "I don't play a character, I am."
 
-nakari 是一个独特的 AI agent，她通过积累经验发展出鲜明的个性，而不是扮演预设的角色。
+The core principle: nakari does not perform role-play. Instead, she:
+1. Gathers information through iterative **ReAct loops**
+2. Forms her own insights and understanding
+3. Writes experiences to her **memory library** (Neo4j graph database)
+4. Uses the memory library to form unique perspectives
 
-## 核心理念
+Over time, the accumulated memories become unique to each nakari instance, reflecting her individual characteristics.
 
-nakari 的独特性来源于她拥有一个**独属于自己的 Neo4j 图数据库记忆库**。她拥有完全的自主权：
-
-- **写什么** — 自主决定将哪些信息、见解和经验存入记忆库
-- **读什么** — 根据当前情境选择检索哪些记忆
-- **关联探索** — 在图数据库中自由查找节点间的关联关系
-
-每个 nakari 实例的记忆库都是独一无二的，即使面对相同的输入，不同的记忆积累也会产生不同的反应和见解。
-
-## 架构概览
-
-```
-用户输入
-  │
-  ▼
-┌──────────────────────────────────────┐
-│            ReAct 循环                 │
-│                                      │
-│  Thought ─► Action ─► Observation    │
-│      ▲                     │         │
-│      └─────────────────────┘         │
-│                                      │
-│  Action 可以是:                       │
-│   - memory_query / memory_write      │
-│   - memory_schema                    │
-│   - 其他 MCP tools                   │
-└──────────────────────────────────────┘
-  │
-  ▼
-最终回复
-```
-
-## 技术栈
-
-| 组件 | 技术 |
-|------|------|
-| Runtime | Node.js (LTS) |
-| Language | TypeScript (strict mode) |
-| Database | Neo4j 5 |
-| Protocol | MCP (Model Context Protocol) |
-| LLM | Claude / OpenAI |
-
-## 快速开始
-
-### 前置要求
-
-- [Node.js](https://nodejs.org/) (LTS 版本)
-- [pnpm](https://pnpm.io/) (或 npm)
-- [Docker](https://www.docker.com/) (用于运行 Neo4j)
-
-### 1. 启动 Neo4j
+## Installation
 
 ```bash
-docker-compose up -d
+# Install dependencies
+pip install -e .
+
+# Or install from requirements.txt
+pip install -r requirements.txt
 ```
 
-Neo4j 将在以下端口运行：
-- Browser UI: http://localhost:7474
-- Bolt 协议: `localhost:7687`
-- 默认认证: `neo4j/nakari-dev`
-
-### 2. 安装依赖
+### Neo4j Setup
 
 ```bash
-pnpm install
+# Start Neo4j database
+docker compose up -d
+
+# Neo4j Browser UI: http://localhost:7474
+# Bolt protocol: bolt://localhost:7687
+# Default auth: neo4j/nakari-dev
 ```
 
-### 3. 配置环境变量
+### Environment Variables
 
-创建 `.env` 文件：
+Copy `.env.example` to `.env` and configure:
 
 ```bash
-# Neo4j 连接
+# LLM API (OpenAI-compatible)
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-4o
+OPENAI_EMBEDDING_MODEL=  # Optional - embedding model for vector search (defaults to text-embedding-3-small)
+OPENAI_BASE_URL=  # Optional - for non-OpenAI providers (Zhipu, DeepSeek, etc.)
+
+# Neo4j
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=nakari-dev
 
-# LLM API
-OPENAI_API_KEY=your_openai_key
-OPENAI_MODEL=
-OPENAI_BASE_URL=
+# Serper.dev (optional - for web search)
+SERPER_API_KEY=your-serper-key
 ```
 
-### 4. 运行
+## Usage
 
 ```bash
-pnpm dev
+# Run the interactive CLI
+nakari
+
+# Or using Python module
+python -m nakari.cli
 ```
 
-## 开发指南
+### CLI Commands
 
-### 项目结构
+- `/quit` or `/exit` - Exit the conversation
+- `/help` - Show help message
+- `/schema` - Display database schema
+
+## Architecture
+
+### ReAct Loop Pattern
+
+The agent operates using a ReAct (Reasoning + Acting) loop:
 
 ```
-src/
-├── index.ts              # 入口文件
-├── agent/                # ReAct 循环和核心 agent 逻辑
-├── memory/               # Neo4j 记忆系统
-├── mcp/                  # MCP 服务集成
-└── config/               # 配置加载
+User Input
+    │
+    ▼
+┌──────────────────────────────────────┐
+│            ReAct Loop                 │
+│  (max 10 iterations)              │
+│                                   │
+│  Thought ─► Action ─► Observation│
+│      ▲                    │        │
+│      └─────────────────────┘        │
+│                                   │
+│  Actions can be:                    │
+│   - memory_query (read Cypher)     │
+│   - memory_write (write Cypher)    │
+│   - memory_schema (inspect DB)     │
+│   - embedding (generate vector)     │
+│   - web_search (search internet)   │
+└──────────────────────────────────────┘
+    │
+    ▼
+Final Response
 ```
 
-### 常用命令
+**Key modules:**
+- `nakari/agent/loop.py` - ReAct loop engine with `MAX_ITERATIONS = 10`
+- `nakari/agent/prompt.py` - System prompt (schema-free philosophy)
+- `nakari/agent/tools.py` - OpenAI function-calling tool definitions
+- `nakari/cli.py` - Interactive REPL interface
 
-```bash
-# 开发模式运行
-pnpm dev
+### Memory System (Neo4j)
 
-# 构建
-pnpm build
+Uses **Neo4j graph database** for memory storage.
 
-# 运行测试
-pnpm test
+**Why Neo4j:** Graph databases provide strong relational capabilities, allowing nakari to freely explore and traverse connections within her memory library, enabling more organic and associative thinking.
 
-# 代码检查
-pnpm lint
+**Key module:**
+- `nakari/memory/` - `MemoryClient` class with `query()`, `write()`, `schema()`, `verify_connectivity()`, `close()`
 
-# 格式化代码
-pnpm format
+### Schema-Free Design
 
-# 类型检查
-pnpm typecheck
+nakari has **full autonomy** over her memory structure:
+- No predefined `Experience`, `Insight`, or other entity types
+- No domain methods like `create_memory()`
+- She writes raw Cypher queries, deciding her own:
+  - Node labels (e.g., `User`, `Conversation`, `Topic`)
+  - Properties (any key-value pairs)
+  - Relationship types and directions
+
+**Five Tools:**
+1. `memory_query` - Read-only Cypher execution
+2. `memory_write` - Write Cypher execution with stats returned
+3. `memory_schema` - Inspect current DB structure
+4. `embedding` - Generate vector embedding for text
+5. `web_search` - Search the web via Serper.dev (optional)
+
+### Web Search Module
+
+The search module (`nakari/search/`) provides extensible web search capability:
+
+- `providers.py` - `SearchProvider` interface + `SerperProvider` implementation
+- `client.py` - `SearchClient` class + `create_serper_client()` factory
+- `types.py` - `SearchResult`, `SearchResponse`, `SearchOptions`
+- `errors.py` - `SearchError`, `SearchAuthError`, `SearchRateLimitError`
+
+## Project Structure
+
+```
+nakari/
+├── __init__.py
+├── cli.py            # Interactive CLI
+├── config/           # Environment-based config
+│   └── __init__.py
+├── agent/            # ReAct loop implementation
+│   ├── __init__.py
+│   ├── loop.py       # ReAct loop engine
+│   ├── prompt.py     # System prompt
+│   └── tools.py      # OpenAI tool definitions
+├── memory/           # Neo4j memory client
+│   └── __init__.py
+└── search/           # Web search module
+    ├── __init__.py
+    ├── client.py
+    ├── providers.py
+    ├── types.py
+    └── errors.py
 ```
 
-## 记忆库设计
+## Tech Stack
 
-nakari 的记忆库采用**无预设 schema** 设计：
-
-- 不预定义 `Experience`、`Insight` 等类型
-- 不提供 `createMemory()` 等 domain 方法
-- nakari 直接写 Cypher 查询，自由决定节点标签、属性和关系
-
-### 三个核心工具
-
-1. **`memory_query`** — 只读查询记忆
-2. **`memory_write`** — 写入/修改记忆
-3. **`memory_schema`** — 查看当前记忆库结构
-
-## 文档
-
-- [CLAUDE.md](./CLAUDE.md) — 项目概述和设计哲学
-- [AGENTS.md](./AGENTS.md) — 代码风格和开发规范
-- [SPCE.md](./SPCE.md) — 详细技术规范
-
-## 当前状态
-
-早期开发阶段。核心架构已设计完成，实现正在进行中。
+| Component | Technology |
+|-----------|------------|
+| Runtime | Python 3.12+ |
+| Database | Neo4j 5 |
+| Search API | Serper.dev (Google Search) |
+| LLM Interface | OpenAI SDK (supports OpenAI-compatible APIs) |
+| CLI UI | Rich |
+| Async Runtime | asyncio |
 
 ## License
 
-AGPL-3.0
-
-
+MIT

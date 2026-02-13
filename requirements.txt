@@ -1,0 +1,19 @@
+# nakari Python dependencies
+
+# OpenAI SDK (supports OpenAI-compatible APIs)
+openai>=1.60.0
+
+# Neo4j async driver
+neo4j>=5.0.0
+
+# HTTP client for search
+httpx>=0.28.0
+
+# Environment variable loading
+python-dotenv>=1.0.0
+
+# Terminal UI
+rich>=13.0.0
+
+# Data validation
+pydantic>=2.10.0
