@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { MemoryClient } from "../memory/client.js";
+import type { SearchClient } from "../search/client.js";
 import { MEMORY_TOOLS } from "./tools.js";
 import { SYSTEM_PROMPT } from "./prompt.js";
 
@@ -8,10 +9,14 @@ const MAX_ITERATIONS = 10;
 export interface LoopOptions {
   /** OpenAI client instance */
   openai: OpenAI;
-  /** Model to use (e.g. "gpt-4o") */
+  /** Chat model to use (e.g. "gpt-4o") */
   model: string;
+  /** Embedding model to use (optional, defaults to "text-embedding-3-small") */
+  embeddingModel?: string;
   /** Memory database client */
   memory: MemoryClient;
+  /** Search client (optional, for web search capability) */
+  search?: SearchClient;
   /** Callback for observing each step of the loop (for logging/debugging) */
   onStep?: (step: LoopStep) => void;
 }
@@ -35,7 +40,7 @@ export async function runReactLoop(
   conversationHistory: OpenAI.ChatCompletionMessageParam[],
   options: LoopOptions,
 ): Promise<string> {
-  const { openai, model, memory, onStep } = options;
+  const { openai, model, embeddingModel, memory, search, onStep } = options;
 
   // Build messages: system + history + new user message
   const messages: OpenAI.ChatCompletionMessageParam[] = [
@@ -83,7 +88,7 @@ export async function runReactLoop(
 
       let result: unknown;
       try {
-        result = await executeTool(fnName, args, memory);
+        result = await executeTool(fnName, args, memory, openai, embeddingModel, search);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         result = { error: errorMessage };
@@ -125,6 +130,9 @@ async function executeTool(
   name: string,
   args: Record<string, unknown>,
   memory: MemoryClient,
+  openai: OpenAI,
+  embeddingModel?: string,
+  search?: SearchClient,
 ): Promise<unknown> {
   switch (name) {
     case "memory_query": {
@@ -139,6 +147,44 @@ async function executeTool(
     }
     case "memory_schema": {
       return await memory.schema();
+    }
+    case "embedding": {
+      const text = args["text"] as string;
+      const model = embeddingModel ?? "text-embedding-3-small";
+      const response = await openai.embeddings.create({
+        model,
+        input: text,
+      });
+      const vector = response.data[0]?.embedding;
+      if (!vector) {
+        return { error: "Failed to generate embedding" };
+      }
+      return { vector };
+    }
+    case "web_search": {
+      if (!search) {
+        return { error: "Search client not configured" };
+      }
+      const query = args["query"] as string;
+      const numResults = args["numResults"] as number | undefined;
+      const type = args["type"] as "search" | "news" | "images" | "videos" | undefined;
+
+      const response = await search.search(query, {
+        numResults: numResults ?? 10,
+        type: type ?? "search",
+      });
+
+      return {
+        query: response.query,
+        results: response.results.map((r) => ({
+          title: r.title,
+          url: r.link,
+          snippet: r.snippet,
+          date: r.date,
+          siteName: r.siteName,
+        })),
+        totalResults: response.totalResults,
+      };
     }
     default:
       return { error: `Unknown tool: ${name}` };

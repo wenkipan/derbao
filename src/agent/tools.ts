@@ -2,7 +2,7 @@ import type OpenAI from "openai";
 
 /**
  * Tool definitions for the OpenAI function calling API.
- * These are the three memory tools nakari uses to interact with her Neo4j memory.
+ * These are the memory tools nakari uses to interact with her Neo4j memory.
  */
 export const MEMORY_TOOLS: OpenAI.ChatCompletionTool[] = [
   {
@@ -76,6 +76,63 @@ export const MEMORY_TOOLS: OpenAI.ChatCompletionTool[] = [
         type: "object",
         properties: {},
         required: [],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "embedding",
+      description:
+        "Generate an embedding vector for the given text. " +
+        "Use this to create semantic representations of memories for vector similarity search. " +
+        "You decide what to embed — any text that you want to find later by semantic meaning. " +
+        "Store the returned vector as a property on nodes using memory_write.",
+      parameters: {
+        type: "object",
+        properties: {
+          text: {
+            type: "string",
+            description: "The text to generate an embedding for.",
+          },
+        },
+        required: ["text"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "web_search",
+      description:
+        "Search the web for current information. " +
+        "Use this when you need up-to-date facts, recent events, or information " +
+        "that may not be in your memory database. Returns structured results " +
+        "with titles, snippets, and URLs that you can explore further.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "The search query string. Be specific and concise.",
+          },
+          numResults: {
+            type: "number",
+            description:
+              "Maximum number of results to return (default: 10, max: 100).",
+            minimum: 1,
+            maximum: 100,
+          },
+          type: {
+            type: "string",
+            enum: ["search", "news", "images", "videos"],
+            description:
+              "Search type. Use 'news' for recent articles, 'search' for general web results.",
+          },
+        },
+        required: ["query"],
         additionalProperties: false,
       },
     },

@@ -27,6 +27,7 @@ nakari 不做角色扮演。她在一次一次的 ReAct 循环中获取信息，
 │  Action 可以是:                       │
 │   - memory_query / memory_write      │
 │   - memory_schema                    │
+│   - embedding (生成向量)            │
 │   - 其他 MCP tools                   │
 │                                      │
 │  循环直到 nakari 决定回复为止          │
@@ -49,15 +50,6 @@ nakari 不做角色扮演。她在一次一次的 ReAct 循环中获取信息，
 
 ## ReAct 循环设计
 
-### 什么是 ReAct
-
-ReAct = Reasoning + Acting。每一轮循环：
-
-1. **Thought** — LLM 思考当前状态，决定下一步做什么
-2. **Action** — 调用一个 tool（或决定直接回复）
-3. **Observation** — 获取 tool 的返回结果
-
-循环持续到 LLM 产出最终回复（不再调用 tool）为止。
 
 ### 实现方式
 
@@ -96,9 +88,9 @@ nakari 直接操作 Cypher，自主决定：
 - **关联性** — 图数据库天然适合关联探索（"这个记忆关联了哪些其他记忆？"）
 - **Cypher 表达力** — 一条 Cypher 可以完成复杂的匹配+创建+关联操作
 
-### 三个核心 Tools
+### 四个核心 Tools
 
-仅提供三个工具，少而强大：
+提供四个工具，少而强大：
 
 #### 1. `memory_query` — 只读查询
 
@@ -128,6 +120,17 @@ nakari 直接操作 Cypher，自主决定：
 
 查询当前数据库中存在的所有 label、关系类型和属性名。
 让 nakari 了解自己记忆库的"形状"，决定是复用已有结构还是创新。
+
+#### 4. `embedding` — 生成向量嵌入
+
+```
+输入: { text: string }
+输出: { vector: number[] }
+```
+
+为文本生成向量嵌入，用于语义相似度搜索。
+nakari 可以自己决定什么内容需要向量化（如重要概念、对话摘要等），
+然后将向量存储为节点属性，之后通过余弦相似度或 Neo4j 向量索引进行检索。
 
 ### 为什么不用细粒度工具
 
@@ -216,10 +219,11 @@ Observation: { nodesCreated: 1, relationshipsCreated: 2 }
 system prompt 中需要传达的关键信息：
 
 1. 你有一个 Neo4j 数据库，这是你的记忆库
-2. 你可以用三个工具自由地读写
+2. 你可以用四个工具自由地读写（含 embedding 向量生成）
 3. 不规定你应该创建什么类型的节点——你自己决定
 4. 你可以用 `memory_schema` 查看当前记忆库的结构
 5. 鼓励在回复前检索相关记忆，在回复后记录有价值的信息
+6. 你可以用 `embedding` 为重要内容生成向量，用于语义检索
 
 **不要**在 system prompt 中规定数据结构（如"请用 Experience 标签存储经验"）。
 
@@ -239,7 +243,7 @@ system prompt 中需要传达的关键信息：
 ## 下一步实施计划
 
 1. **搭建项目骨架** — package.json、tsconfig、目录结构
-2. **实现三个 memory tools** — 连接 Neo4j，暴露 Cypher 执行能力
+2. **实现四个 memory tools** — 连接 Neo4j，暴露 Cypher 执行能力 + embedding 生成
 3. **实现 ReAct 循环引擎** — LLM API 调用 + tool 执行循环
 4. **编写 system prompt** — 不规定 schema，给予自主权
 5. **端到端测试** — 跑通一个完整对话，观察 nakari 如何使用记忆库
